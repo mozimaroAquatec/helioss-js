@@ -200,75 +200,71 @@ exports.existYear = existYear;
 /**
  *@desc  Subscribes to an MQTT topic and updates Helioss records based on received messages.
  *
- * @param {string} topic - The MQTT topic to subscribe to.
+ * * @param {string[]} topics - The MQTT topics to subscribe to.
  * @returns {Promise<void>} - A promise that resolves once the function completes its task.
  * @throws {ErrorResponse} - If there's an error while updating Helioss records.
  */
-const updateHeliossByMqtt = async (topic) => {
-    // Subscribe to the specified MQTT topic
-    (0, mqtt_services_1.mqttSubscribe)(topic);
+const updateHeliossByMqtt = async (topics) => {
+    // Subscribe to the specified MQTT topics
+    topics.forEach((topic) => (0, mqtt_services_1.mqttSubscribe)(topic));
     // Event handler for receiving MQTT messages
     mqttClient.on("message", async (topic, message) => {
-        // Process messages based on topic
-        switch (topic) {
-            case "Helioss/Energie": {
-                // Log the received message
-                logger.mqttLogger.info({ topic, message: message.toString() }, `Received message from topic: ${topic} and the message is: ${message.toString()}`);
-                try {
+        const messageString = message.toString();
+        // Log the received message
+        logger.mqttLogger.info({ topic, message: messageString }, `Received message from topic: ${topic} and the message is: ${messageString}`);
+        try {
+            switch (topic) {
+                case "Helioss/Energie":
+                    console.log("on Energie");
                     // Update energy records based on the received message
-                    await (0, exports.updateEnergiesByDateAndTime)(message.toString());
-                }
-                catch (error) {
-                    // Log and throw an error if updating energy records fails
-                    logger.heliossLogger.error(error, "Update energy error caught in controller");
-                    throw new error_handler_1.default("fail", `Update energies error: ${error}`);
-                }
-                break;
-            }
-            case "Helioss/Filtration": {
-                // Log the received message
-                logger.mqttLogger.info({ topic, message: message.toString() }, `Received message from topic: ${topic} and the message is: ${message.toString()}`);
-                try {
+                    await (0, exports.updateEnergiesByDateAndTime)(messageString);
+                    break;
+                case "Helioss/Filtration":
+                    console.log("on Filtration");
                     // Update filtration records based on the received message
-                    await (0, exports.updateFiltrationsbyDate)(message.toString());
-                }
-                catch (error) {
-                    // Log and throw an error if updating filtration records fails
-                    logger.heliossLogger.error(error, "Update filtrations error caught in controller");
-                    throw new error_handler_1.default("fail", `Update filtrations error: ${error}`);
-                }
-                break;
+                    await (0, exports.updateFiltrationsbyDate)(messageString);
+                    break;
+                default:
+                    console.log(`No handler for topic: ${topic}`);
+                    break;
             }
+        }
+        catch (error) {
+            // Log and throw an error if updating records fails
+            logger.heliossLogger.error(error, `Update error caught in controller for topic: ${topic}`);
+            throw new error_handler_1.default("fail", `Update error for topic ${topic}: ${error}`);
         }
     });
 };
 exports.updateHeliossByMqtt = updateHeliossByMqtt;
 /**
- * @desc This function subscribes to an MQTT topic and handles incoming messages for geolocation data.
+ * @desc This function subscribes to multiple MQTT topics and handles incoming messages for geolocation data.
  * It retrieves geolocation information such as latitude and longitude from received messages,
  * and performs actions based on the topic.
- * @param {string} topic - The MQTT topic to subscribe to.
+ * @param {string[]} topics - The MQTT topics to subscribe to.
+ * @returns {Promise<void>} - A promise that resolves once the function completes its task.
+ * @throws {ErrorResponse} - If there's an error while updating Helioss records.
  */
-const geolocationSubAnPubByMqtt = async (topic) => {
-    // Subscribe to the specified MQTT topic
-    (0, mqtt_services_1.mqttSubscribe)(topic);
+const geolocationSubAnPubByMqtt = async (topics) => {
+    // Subscribe to the specified MQTT topics
+    topics.forEach((topic) => (0, mqtt_services_1.mqttSubscribe)(topic));
     // Ensure no duplicate listeners
-    mqttClient.removeAllListeners("message");
+    // mqttClient.removeAllListeners("message");
     // Event handler for receiving MQTT messages
     mqttClient.on("message", async (receivedTopic, message) => {
         const messageStr = message.toString();
         const [longitude, latitude] = messageStr.split(":");
         switch (receivedTopic) {
             case "Helioss/Geolocation": {
-                const currrendDate = (0, datetime_1.default)().currentDateWithMs.toString();
-                logger.consoleLogger?.info({ currrendDate }, "current date with ms");
-                logger.mqttLogger.info({ topic: receivedTopic, message: messageStr }, `received message from topic : ${receivedTopic} and the message is :${messageStr}`);
-                logger.consoleLogger?.info({ latitude, longitude }, `latitude: ${latitude} and longitude : ${longitude}`);
-                (0, mqtt_services_1.mqttPublish)("Geolocation/CurentDate", Buffer.from(currrendDate));
+                const currentDate = (0, datetime_1.default)().currentDateWithMs.toString();
+                logger.consoleLogger?.info({ currentDate }, "current date with ms");
+                logger.mqttLogger.info({ topic: receivedTopic, message: messageStr }, `Received message from topic: ${receivedTopic} and the message is: ${messageStr}`);
+                logger.consoleLogger?.info({ latitude, longitude }, `Latitude: ${latitude} and longitude: ${longitude}`);
+                (0, mqtt_services_1.mqttPublish)("Geolocation/CurentDate", Buffer.from(currentDate));
                 break;
             }
             case "Helioss/Cloud": {
-                logger.mqttLogger.info({ topic: receivedTopic, message }, `Received message from topic : ${receivedTopic} and the message is :${messageStr}`);
+                logger.mqttLogger.info({ topic: receivedTopic, message: messageStr }, `Received message from topic: ${receivedTopic} and the message is: ${messageStr}`);
                 try {
                     logger.consoleLogger?.info(`Fetching cloud cover for latitude: ${latitude}, longitude: ${longitude}`);
                     const cloud = await weathermapServices.getNextDayCloudCover(latitude, longitude);
@@ -277,23 +273,29 @@ const geolocationSubAnPubByMqtt = async (topic) => {
                 }
                 catch (error) {
                     logger.consoleLogger?.error({ error }, `Error fetching cloud cover data: ${error}`);
-                    throw new error_handler_1.default("fail", `getNextDayCloudCover : ${error}`);
+                    throw new error_handler_1.default("fail", `getNextDayCloudCover: ${error}`);
                 }
                 break;
             }
             case "Helioss/Temperature": {
-                logger.mqttLogger.info({ topic: receivedTopic, message }, `received message from topic : ${receivedTopic} and the message is :${messageStr}`);
+                logger.mqttLogger.info({ topic: receivedTopic, message: messageStr }, `Received message from topic: ${receivedTopic} and the message is: ${messageStr}`);
                 try {
                     const temperature = await weathermapServices.getTodayTemperature(latitude, longitude);
                     (0, mqtt_services_1.mqttPublish)("Geolocation/Temperature", Buffer.from(temperature.toString()));
                 }
                 catch (error) {
-                    throw new error_handler_1.default("fail", `getTodayTemperature : ${error}`);
+                    logger.consoleLogger?.error({ error }, `Error fetching temperature data: ${error}`);
+                    throw new error_handler_1.default("fail", `getTodayTemperature: ${error}`);
                 }
                 break;
             }
+            default:
+                console.log(`No handler for topic: ${receivedTopic}`);
+                break;
         }
     });
 };
 exports.geolocationSubAnPubByMqtt = geolocationSubAnPubByMqtt;
+// Call the function with the topics
+// Call the function with both topics
 //# sourceMappingURL=helioss.services.js.map

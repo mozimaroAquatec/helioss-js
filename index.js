@@ -32,7 +32,6 @@ const cors_1 = __importDefault(require("cors"));
 require("./config/env.config");
 const page_not_found_1 = __importDefault(require("./middlewares/page.not.found"));
 const logging_1 = require("./logging");
-//Helioss/Energie
 const mqtt_services_1 = require("./services/mqtt.services");
 const heliossServices = __importStar(require("./services/helioss.services"));
 const helioss_routes_1 = __importDefault(require("./routes/helioss.routes"));
@@ -45,11 +44,12 @@ app.use((0, cors_1.default)());
 (0, connect_db_1.default)();
 // Connecting to Mqtt server
 (0, mqtt_services_1.mqttConeect)();
-heliossServices.updateHeliossByMqtt("Helioss/Energie");
-heliossServices.updateHeliossByMqtt("Helioss/Filtration");
-heliossServices.geolocationSubAnPubByMqtt("Helioss/Geolocation");
-heliossServices.geolocationSubAnPubByMqtt("Helioss/Temperature");
-heliossServices.geolocationSubAnPubByMqtt("Helioss/Cloud");
+heliossServices.updateHeliossByMqtt(["Helioss/Energie", "Helioss/Filtration"]);
+heliossServices.geolocationSubAnPubByMqtt([
+    "Helioss/Geolocation",
+    "Helioss/Cloud",
+    "Helioss/Temperature",
+]);
 app.use("/", helioss_routes_1.default);
 app.use("*", page_not_found_1.default);
 // Starting the server and listening on the specified port
